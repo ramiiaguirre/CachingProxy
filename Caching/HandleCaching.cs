@@ -6,6 +6,10 @@ namespace Caching;
 public class HandleCaching
 {
 
+    string? _originURL;
+
+    HttpListenerRequest? _request;
+    HttpListenerResponse _response;
     private readonly Dictionary<string, CachedResponse> _cache = new();
 
     // ServiceCachingProxy _service = new();
@@ -15,94 +19,122 @@ public class HandleCaching
 
     public async Task HandleCachingRequest(HttpListenerContext context, string originUrl)
     {
-        var request = context.Request;
-        var response = context.Response;
+        _request = context.Request;
+        _response = context.Response;
+        _originURL = originUrl;
 
         try
         {
-            string path = request.Url?.PathAndQuery ?? "/";
-            string cacheKey = $"{request.HttpMethod}:{path}";
+            string path = _request.Url?.PathAndQuery ?? "/";
+            string cacheKey = $"{_request.HttpMethod}:{path}";
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {request.HttpMethod} {path}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {_request.HttpMethod} {path}");
 
             // Verificar si la respuesta está en caché
-            if (_cache.TryGetValue(cacheKey, out var cachedResponse))
+            if (await ResponseInCache(_response, cacheKey))
             {
-                Console.WriteLine($"  → Cache HIT");
-                response.StatusCode = cachedResponse.StatusCode;
-                response.ContentType = cachedResponse.ContentType;
-                response.Headers.Add("X-Cache", "HIT");
-
-                await response.OutputStream.WriteAsync(cachedResponse.Body);
-                response.OutputStream.Close();
                 return;
             }
 
             Console.WriteLine($"  → Cache MISS");
 
-            // Construir la URL completa
-            string targetUrl = $"{originUrl?.TrimEnd('/')}{path}";
-
-            // Crear solicitud al servidor de origen
-            var originRequest = new HttpRequestMessage(
-                new HttpMethod(request.HttpMethod),
-                targetUrl
-            );
-
-            // Copiar headers relevantes
-            foreach (string? headerName in request.Headers.AllKeys)
-            {
-                if (headerName != null && 
-                    !headerName.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
-                    !headerName.Equals("Connection", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        originRequest.Headers.TryAddWithoutValidation(
-                            headerName, 
-                            request.Headers[headerName]
-                        );
-                    }
-                    catch { }
-                }
-            }
-
-            // Enviar solicitud al origen
-            var originResponse = await _httpClient.SendAsync(originRequest);
-
-            // Leer el contenido de la respuesta
-            var responseBody = await originResponse.Content.ReadAsByteArrayAsync();
-
-            // Guardar en caché si la respuesta es exitosa
-            if (originResponse.IsSuccessStatusCode)
-            {
-                _cache[cacheKey] = new CachedResponse
-                {
-                    StatusCode = (int)originResponse.StatusCode,
-                    ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain",
-                    Body = responseBody
-                };
-            }
-
-            // Enviar respuesta al cliente
-            response.StatusCode = (int)originResponse.StatusCode;
-            response.ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain";
-            response.Headers.Add("X-Cache", "MISS");
-
-            await response.OutputStream.WriteAsync(responseBody);
-            response.OutputStream.Close();
-
-            Console.WriteLine($"  → Status: {originResponse.StatusCode}");
+            await ExecuteAPICall(cacheKey, path);
+            
         }
         catch (Exception ex)
         {
             Console.WriteLine($"  → Error: {ex.Message}");
-            
-            response.StatusCode = 500;
+
+            _response.StatusCode = 500;
             var errorBytes = Encoding.UTF8.GetBytes($"Error del proxy: {ex.Message}");
-            await response.OutputStream.WriteAsync(errorBytes);
-            response.OutputStream.Close();
+            await _response.OutputStream.WriteAsync(errorBytes);
+            _response.OutputStream.Close();
         }
     }
 
+    /// <summary>
+    /// If response is Cached, X-Cache header is changed to HIT
+    /// </summary>
+    /// <param name="response"></param>
+    /// <param name="cacheKey"></param>
+    /// <returns></returns>
+    async Task<bool> ResponseInCache(HttpListenerResponse response, string cacheKey)
+    {
+        if (_cache.TryGetValue(cacheKey, out var cachedResponse))
+        {
+            Console.WriteLine($"  → Cache HIT");
+            response.StatusCode = cachedResponse.StatusCode;
+            response.ContentType = cachedResponse.ContentType;
+            response.Headers.Add("X-Cache", "HIT");
+
+            await response.OutputStream.WriteAsync(cachedResponse.Body);
+            response.OutputStream.Close();
+            return true;
+        }
+        return false;
+    }
+
+    async Task ExecuteAPICall(string cacheKey, string path)
+    {
+        // Construir la URL completa
+        string targetUrl = $"{_originURL?.TrimEnd('/')}{path}";
+
+        // Crear solicitud al servidor de origen
+        var originRequest = new HttpRequestMessage(
+            new HttpMethod(_request!.HttpMethod),
+            targetUrl
+        );
+
+        CopyRelevantHeaders(originRequest);        
+
+        // Enviar solicitud al origen
+        HttpResponseMessage originResponse = await _httpClient.SendAsync(originRequest);
+
+        // Leer el contenido de la respuesta
+        byte[] responseBody = await originResponse.Content.ReadAsByteArrayAsync();
+
+        // Guardar en caché si la respuesta es exitosa
+        if (originResponse.IsSuccessStatusCode)
+            SaveToCache(cacheKey, originResponse, responseBody);
+
+        // Enviar respuesta al cliente
+        _response.StatusCode = (int)originResponse.StatusCode;
+        _response.ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain";
+        _response.Headers.Add("X-Cache", "MISS");
+
+        await _response.OutputStream.WriteAsync(responseBody);
+        _response.OutputStream.Close();
+
+        Console.WriteLine($"  → Status: {originResponse.StatusCode}");
+    }
+
+    void CopyRelevantHeaders(HttpRequestMessage originRequest)
+    {
+        foreach (string? headerName in _request!.Headers.AllKeys)
+        {
+            if (headerName != null &&
+                !headerName.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
+                !headerName.Equals("Connection", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    originRequest.Headers.TryAddWithoutValidation(
+                        headerName,
+                        _request.Headers[headerName]
+                    );
+                }
+                catch { }
+            }
+        }
+    }
+
+    void SaveToCache(string cacheKey, HttpResponseMessage originResponse, byte[] responseBody)
+    {
+        _cache[cacheKey] = new CachedResponse
+        {
+            StatusCode = (int)originResponse.StatusCode,
+            ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain",
+            Body = responseBody
+        };
+    }
 }
