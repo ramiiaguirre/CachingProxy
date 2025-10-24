@@ -22,7 +22,7 @@ public class ServerListener
             while (true)
             {
                 var context = await listener.GetContextAsync();
-                _ = Task.Run(() => _handleCaching.HandleRequest(context));
+                _ = Task.Run(() => _handleCaching.HandleCachingRequest(context, originUrl!));
             }
         }
         catch (Exception ex)

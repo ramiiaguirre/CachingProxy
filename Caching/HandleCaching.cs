@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 
 namespace Caching;
 
@@ -6,8 +7,13 @@ public class HandleCaching
 {
 
     private readonly Dictionary<string, CachedResponse> _cache = new();
-    
-    public async Task HandleRequest(HttpListenerContext context)
+
+    // ServiceCachingProxy _service = new();
+
+
+    HttpClient _httpClient = new HttpClient();
+
+    public async Task HandleCachingRequest(HttpListenerContext context, string originUrl)
     {
         var request = context.Request;
         var response = context.Response;
@@ -35,7 +41,7 @@ public class HandleCaching
             Console.WriteLine($"  → Cache MISS");
 
             // Construir la URL completa
-            string targetUrl = $"{_originUrl?.TrimEnd('/')}{path}";
+            string targetUrl = $"{originUrl?.TrimEnd('/')}{path}";
 
             // Crear solicitud al servidor de origen
             var originRequest = new HttpRequestMessage(
@@ -44,7 +50,7 @@ public class HandleCaching
             );
 
             // Copiar headers relevantes
-            foreach (string headerName in request.Headers.AllKeys)
+            foreach (string? headerName in request.Headers.AllKeys)
             {
                 if (headerName != null && 
                     !headerName.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
