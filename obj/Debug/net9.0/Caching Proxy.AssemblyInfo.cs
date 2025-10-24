@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Caching Proxy")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2cc828f7406537662aa7bb0fe7245f2457cea182")]
 [assembly: System.Reflection.AssemblyProductAttribute("Caching Proxy")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Caching Proxy")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
