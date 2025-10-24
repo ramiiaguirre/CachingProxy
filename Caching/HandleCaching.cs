@@ -9,7 +9,7 @@ public class HandleCaching
     string? _originURL;
 
     HttpListenerRequest? _request;
-    HttpListenerResponse _response;
+    HttpListenerResponse? _response;
     private readonly Dictionary<string, CachedResponse> _cache = new();
 
     // ServiceCachingProxy _service = new();
@@ -27,6 +27,8 @@ public class HandleCaching
         {
             string path = _request.Url?.PathAndQuery ?? "/";
             string cacheKey = $"{_request.HttpMethod}:{path}";
+
+            Console.WriteLine(cacheKey);
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {_request.HttpMethod} {path}");
 
@@ -98,7 +100,7 @@ public class HandleCaching
             SaveToCache(cacheKey, originResponse, responseBody);
 
         // Enviar respuesta al cliente
-        _response.StatusCode = (int)originResponse.StatusCode;
+        _response!.StatusCode = (int)originResponse.StatusCode;
         _response.ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain";
         _response.Headers.Add("X-Cache", "MISS");
 
