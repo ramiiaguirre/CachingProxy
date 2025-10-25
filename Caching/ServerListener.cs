@@ -5,7 +5,12 @@ namespace Caching;
 
 public class ServerListener
 {
-    HandleCaching _handleCaching = new HandleCaching();
+    HandleCaching _handleCaching;
+
+    public ServerListener(HandleCaching handleCaching)
+    {
+        _handleCaching = handleCaching;
+    }
     public async Task StartProxyServer(int port, string? originUrl)
     {
         var listener = new HttpListener();

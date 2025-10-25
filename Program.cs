@@ -8,6 +8,18 @@ class Program
     
     static async Task Main(string[] args)
     {
+
+        HandleCaching _handleCaching = new();
+        CachingProcessInformation? info;
+
+        // Verificar si es comando de limpiar caché
+        if (args.Length > 0 && args[0] == "--clear-cache")
+        {
+            info = _handleCaching.ClearCache();
+            Console.WriteLine(info.Message);
+            return;
+        }
+        
         var arguments = ParseArguments(args);
 
         if (!arguments.ContainsKey("--port") || !arguments.ContainsKey("--origin"))
@@ -24,6 +36,7 @@ class Program
 
         _originUrl = arguments["--origin"];
 
+
         // Validar la URL de origen
         if (!Uri.TryCreate(_originUrl, UriKind.Absolute, out _))
         {
@@ -31,7 +44,11 @@ class Program
             return;
         }
 
-        ServerListener _server = new ServerListener();
+
+        info = _handleCaching.LoadCache();
+        Console.WriteLine(info.Message);
+
+        ServerListener _server = new ServerListener(_handleCaching);
         await _server.StartProxyServer(port, arguments["--origin"]);
 
     }
@@ -54,14 +71,19 @@ class Program
 
     static void ShowUsage()
     {
-        Console.WriteLine("Uso: caching-proxy --port <number> --origin <url>");
+        Console.WriteLine("Uso: caching-proxy [OPCIONES]");
+        Console.WriteLine();
+        Console.WriteLine("Iniciar servidor:");
+        Console.WriteLine("  caching-proxy --port <number> --origin <url>");
         Console.WriteLine();
         Console.WriteLine("Opciones:");
-        Console.WriteLine("  --port    Puerto en el que correrá el servidor proxy");
-        Console.WriteLine("  --origin  URL del servidor al que se reenviarán las solicitudes");
+        Console.WriteLine("  --port        Puerto en el que correrá el servidor proxy");
+        Console.WriteLine("  --origin      URL del servidor al que se reenviarán las solicitudes");
+        Console.WriteLine("  --clear-cache Limpiar todo el caché almacenado");
         Console.WriteLine();
-        Console.WriteLine("Ejemplo:");
+        Console.WriteLine("Ejemplos:");
         Console.WriteLine("  caching-proxy --port 3000 --origin http://dummyjson.com");
+        Console.WriteLine("  caching-proxy --clear-cache");
     }
 
 

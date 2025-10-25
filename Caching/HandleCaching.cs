@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace Caching;
 
@@ -12,11 +13,19 @@ public class HandleCaching
     HttpListenerResponse? _response;
     private readonly Dictionary<string, CachedResponse> _cache = new();
 
-    // ServiceCachingProxy _service = new();
-
+    private readonly string _cacheDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CachingProxy",
+        "cache"
+    );
+    private string _cacheFilePath;
 
     HttpClient _httpClient = new HttpClient();
 
+    public HandleCaching()
+    {
+        _cacheFilePath = Path.Combine(_cacheDirectory, "cache.json");
+    }
     public async Task HandleCachingRequest(HttpListenerContext context, string originUrl)
     {
         _request = context.Request;
@@ -41,7 +50,7 @@ public class HandleCaching
             Console.WriteLine($"  → Cache MISS");
 
             await ExecuteAPICall(cacheKey, path);
-            
+
         }
         catch (Exception ex)
         {
@@ -87,7 +96,7 @@ public class HandleCaching
             targetUrl
         );
 
-        CopyRelevantHeaders(originRequest);        
+        CopyRelevantHeaders(originRequest);
 
         // Enviar solicitud al origen
         HttpResponseMessage originResponse = await _httpClient.SendAsync(originRequest);
@@ -138,5 +147,102 @@ public class HandleCaching
             ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain",
             Body = responseBody
         };
+
+        SaveCache();
+    }
+
+    public CachingProcessInformation LoadCache()
+    {
+        try
+        {
+            if (File.Exists(_cacheFilePath))
+            {
+                var json = File.ReadAllText(_cacheFilePath);
+                var cacheData = JsonSerializer.Deserialize<Dictionary<string, CachedResponse>>(json);
+
+                if (cacheData != null)
+                {
+                    foreach (var item in cacheData)
+                    {
+                        _cache[item.Key] = item.Value;
+                    }
+                }
+            }
+            return new CachingProcessInformation()
+            {
+                Message = $"✓ Caché cargado: {_cache.Count} entradas",
+                ExitProcess = true
+            };
+
+        }
+        catch (Exception ex)
+        {
+            return new CachingProcessInformation()
+            {
+                Message = $"⚠ Advertencia: No se pudo cargar el caché: {ex.Message}",
+                ExitProcess = false
+            };
+        }
+    }
+
+    public CachingProcessInformation ClearCache()
+    {
+        try
+        {
+            if (File.Exists(_cacheFilePath))
+            {
+                File.Delete(_cacheFilePath);
+                return new CachingProcessInformation()
+                {
+                    Message = $"✓ Caché limpiado exitosamente \nArchivo eliminado: {_cacheFilePath}",
+                    ExitProcess = true
+                };
+            }
+            else
+            {
+                return new CachingProcessInformation()
+                {
+                    Message = $"✓ No hay caché para limpiar",
+                    ExitProcess = true
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            return new CachingProcessInformation()
+            {
+                Message = $"✗ Error al limpiar el caché: {ex.Message}",
+                ExitProcess = false
+            };
+        }
+    }
+
+    public CachingProcessInformation SaveCache()
+    {
+        try
+        {
+            // Crear directorio si no existe
+            Directory.CreateDirectory(_cacheDirectory);
+
+            var json = JsonSerializer.Serialize(_cache, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+
+            File.WriteAllText(_cacheFilePath, json);
+            return new CachingProcessInformation()
+            {
+                Message = $"Información guardada correctamente.",
+                ExitProcess = true
+            };
+        }
+        catch (Exception ex)
+        {
+            return new CachingProcessInformation()
+            {
+                Message = $"⚠ Advertencia: No se pudo guardar el caché: {ex.Message}",
+                ExitProcess = false
+            };
+        }
     }
 }
