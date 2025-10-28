@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using Caching;
+using Microsoft.Extensions.Logging;
 
 class Program
 {
@@ -44,11 +45,16 @@ class Program
             return;
         }
 
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddConsole();
+        });
+        var logger = loggerFactory.CreateLogger<ServerListener>();
 
         info = _handleCaching.LoadCache();
         Console.WriteLine(info.Message);
 
-        ServerListener _server = new ServerListener(_handleCaching);
+        ServerListener _server = new ServerListener(_handleCaching, logger);
         await _server.StartProxyServer(port, arguments["--origin"]);
 
     }

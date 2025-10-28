@@ -21,6 +21,7 @@ public class HandleCaching
     private string _cacheFilePath;
 
     HttpClient _httpClient = new HttpClient();
+    ServiceCachingProxy _service = new();
 
     public HandleCaching()
     {
@@ -99,7 +100,7 @@ public class HandleCaching
         CopyRelevantHeaders(originRequest);
 
         // Enviar solicitud al origen
-        HttpResponseMessage originResponse = await _httpClient.SendAsync(originRequest);
+        HttpResponseMessage originResponse = await _service.Send(originRequest);
 
         // Leer el contenido de la respuesta
         byte[] responseBody = await originResponse.Content.ReadAsByteArrayAsync();
@@ -116,7 +117,7 @@ public class HandleCaching
         await _response.OutputStream.WriteAsync(responseBody);
         _response.OutputStream.Close();
 
-        Console.WriteLine($"  → Status: {originResponse.StatusCode}");
+        // Console.WriteLine($"  → Status: {originResponse.StatusCode}");
     }
 
     void CopyRelevantHeaders(HttpRequestMessage originRequest)

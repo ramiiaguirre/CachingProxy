@@ -1,5 +1,7 @@
 using System.Net;
+
 using System.Reflection.Metadata;
+using Microsoft.Extensions.Logging;
 
 namespace Caching;
 
@@ -7,9 +9,11 @@ public class ServerListener
 {
     HandleCaching _handleCaching;
 
-    public ServerListener(HandleCaching handleCaching)
+    private readonly ILogger<ServerListener>? _logger;
+    public ServerListener(HandleCaching handleCaching, ILogger<ServerListener>? logger = null)
     {
         _handleCaching = handleCaching;
+        _logger = logger;
     }
     public async Task StartProxyServer(int port, string? originUrl)
     {
@@ -19,10 +23,10 @@ public class ServerListener
         try
         {
             listener.Start();
-            Console.WriteLine($"✓ Servidor proxy iniciado en http://localhost:{port}");
-            Console.WriteLine($"✓ Reenviando solicitudes a: {originUrl}");
-            Console.WriteLine($"✓ Presiona Ctrl+C para detener el servidor");
-            Console.WriteLine();
+            
+            _logger?.LogInformation("Servidor proxy iniciado en http://localhost:{Port}", port);
+            _logger?.LogInformation("Reenviando solicitudes a: {Origin}", originUrl);
+            _logger?.LogInformation("Presiona Ctrl+C para detener el servidor");
 
             while (true)
             {
@@ -32,7 +36,7 @@ public class ServerListener
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al iniciar el servidor: {ex.Message}");
+            _logger?.LogError(ex, "Error al iniciar el servidor");
         }
         finally
         {
