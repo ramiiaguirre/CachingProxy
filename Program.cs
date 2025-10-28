@@ -13,7 +13,6 @@ class Program
         HandleCaching _handleCaching = new();
         CachingProcessInformation? info;
 
-        // Verificar si es comando de limpiar caché
         if (args.Length > 0 && args[0] == "--clear-cache")
         {
             info = _handleCaching.ClearCache();
@@ -68,7 +67,7 @@ class Program
             if (args[i].StartsWith("--") && i + 1 < args.Length)
             {
                 arguments[args[i]] = args[i + 1];
-                i++; // Saltar el valor
+                i++;
             }
         }
 

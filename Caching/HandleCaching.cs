@@ -38,23 +38,20 @@ public class HandleCaching
             string path = _request.Url?.PathAndQuery ?? "/";
             string cacheKey = $"{_request.HttpMethod}:{path}";
 
-            Console.WriteLine(cacheKey);
-
+            //add ILogger here instead writeline
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {_request.HttpMethod} {path}");
 
-            // Verificar si la respuesta está en caché
             if (await ResponseInCache(_response, cacheKey))
             {
                 return;
             }
-
-            Console.WriteLine($"  → Cache MISS");
 
             await ExecuteAPICall(cacheKey, path);
 
         }
         catch (Exception ex)
         {
+            //add ILogger here instead writeline
             Console.WriteLine($"  → Error: {ex.Message}");
 
             _response.StatusCode = 500;
@@ -74,7 +71,6 @@ public class HandleCaching
     {
         if (_cache.TryGetValue(cacheKey, out var cachedResponse))
         {
-            Console.WriteLine($"  → Cache HIT");
             response.StatusCode = cachedResponse.StatusCode;
             response.ContentType = cachedResponse.ContentType;
             response.Headers.Add("X-Cache", "HIT");
@@ -88,10 +84,10 @@ public class HandleCaching
 
     async Task ExecuteAPICall(string cacheKey, string path)
     {
-        // Construir la URL completa
+        // Create full URL
         string targetUrl = $"{_originURL?.TrimEnd('/')}{path}";
 
-        // Crear solicitud al servidor de origen
+        // Create origin server request 
         var originRequest = new HttpRequestMessage(
             new HttpMethod(_request!.HttpMethod),
             targetUrl
@@ -99,25 +95,19 @@ public class HandleCaching
 
         CopyRelevantHeaders(originRequest);
 
-        // Enviar solicitud al origen
         HttpResponseMessage originResponse = await _service.Send(originRequest);
 
-        // Leer el contenido de la respuesta
         byte[] responseBody = await originResponse.Content.ReadAsByteArrayAsync();
 
-        // Guardar en caché si la respuesta es exitosa
         if (originResponse.IsSuccessStatusCode)
             SaveToCache(cacheKey, originResponse, responseBody);
 
-        // Enviar respuesta al cliente
         _response!.StatusCode = (int)originResponse.StatusCode;
         _response.ContentType = originResponse.Content.Headers.ContentType?.ToString() ?? "text/plain";
         _response.Headers.Add("X-Cache", "MISS");
 
         await _response.OutputStream.WriteAsync(responseBody);
         _response.OutputStream.Close();
-
-        // Console.WriteLine($"  → Status: {originResponse.StatusCode}");
     }
 
     void CopyRelevantHeaders(HttpRequestMessage originRequest)
