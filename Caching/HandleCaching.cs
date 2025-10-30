@@ -38,9 +38,6 @@ public class HandleCaching
             string path = _request.Url?.PathAndQuery ?? "/";
             string cacheKey = $"{_request.HttpMethod}:{path}";
 
-            //add ILogger here instead writeline
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {_request.HttpMethod} {path}");
-
             if (await ResponseInCache(_response, cacheKey))
             {
                 return;
@@ -51,9 +48,6 @@ public class HandleCaching
         }
         catch (Exception ex)
         {
-            //add ILogger here instead writeline
-            Console.WriteLine($"  → Error: {ex.Message}");
-
             _response.StatusCode = 500;
             var errorBytes = Encoding.UTF8.GetBytes($"Error del proxy: {ex.Message}");
             await _response.OutputStream.WriteAsync(errorBytes);

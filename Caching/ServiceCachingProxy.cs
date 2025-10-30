@@ -1,6 +1,3 @@
-using System.Net.Http.Json;
-using System.Threading.Tasks;
-
 namespace Caching;
 
 public class ServiceCachingProxy
